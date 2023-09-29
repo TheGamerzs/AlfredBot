@@ -12,7 +12,7 @@
 	"author": "",
 	"license": "ISC",
 	"dependencies": {
-		"discord.js": "^12.3.1",
+		"discord.js": "^14.13.0",
 		"dotenv": "^16.0.1",
 		"eslint-config-prettier": "^8.6.0",
 		"eslint-config-strongloop": "^2.1.0",
