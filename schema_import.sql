@@ -192,3 +192,29 @@ CREATE TABLE `website` (
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2022-05-13 14:00:05
+
+DROP TABLE IF EXISTS `vehicleMod`;
+
+CREATE TABLE `vehicleMod` (
+  `mod_hash` VARCHAR(50) NOT NULL,
+    `vehicle_name` VARCHAR(150) NOT NULL,
+    `class` VARCHAR(50) DEFAULT NULL,
+    `mod` VARCHAR(500) NOT NULL,
+    `made_by` VARCHAR(150) DEFAULT NULL,
+    PRIMARY KEY (`vehicle_name`, `mod_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Drop the trigger if it exists
+DROP TRIGGER IF EXISTS `before_insert_vehicleMod`;
+
+-- Create the trigger
+DELIMITER //
+
+CREATE TRIGGER `before_insert_vehicleMod`
+BEFORE INSERT ON `vehicleMod`
+FOR EACH ROW
+BEGIN
+  SET NEW.mod_hash = MD5(CONCAT(NEW.vehicle_name, NEW.mod));
+END //
+
+DELIMITER ;
