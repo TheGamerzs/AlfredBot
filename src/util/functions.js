@@ -74,41 +74,12 @@ module.exports = {
 	 * @param {String} ServerNumber Specified server number
 	 * @returns {[String, Number]} [Server IP, Last server Port number]
 	 */
-	GetServerURL: function (ServerNumber) {
-		if (
-			!ServerNumber ||
-			(ServerNumber.toLowerCase() != 'a' &&
-				ServerNumber.toLowerCase() != 'os' &&
-				(isNaN(parseInt(ServerNumber)) || ServerNumber < 1 || ServerNumber > 9))
-		)
-			return null;
+	GetServerURL: function (serverName) {
+		const server = botconfig.ActiveServers.find(
+			s => s.name.toLowerCase() == serverName.toLowerCase()
+		);
 
-		let server = parseInt(ServerNumber); //convert the string to an int
-
-		if (ServerNumber.toLowerCase() == 'a') {
-			//if the server number is A
-			return 'tycoon-wxjpge.users.cfx.re';
-		} else if (server == 1 || ServerNumber.toLowerCase() == 'os') {
-			return 'tycoon-w8r4q4.users.cfx.re';
-		} else if (server == 2) {
-			return 'tycoon-2epova.users.cfx.re';
-		} else if (server == 3) {
-			return 'tycoon-2epovd.users.cfx.re';
-		} else if (server == 4) {
-			return 'tycoon-wdrypd.users.cfx.re';
-		} else if (server == 5) {
-			return 'tycoon-njyvop.users.cfx.re';
-		} else if (server == 6) {
-			return 'tycoon-2r4588.users.cfx.re';
-		} else if (server == 7) {
-			return 'tycoon-npl5oy.users.cfx.re';
-		} else if (server == 8) {
-			return 'tycoon-2vzlde.users.cfx.re';
-		} else if (server == 9) {
-			return 'tycoon-wmapod.users.cfx.re';
-		} else {
-			return null;
-		}
+		return server.connect_uri;
 	},
 
 	/**
