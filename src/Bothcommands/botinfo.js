@@ -20,8 +20,9 @@ module.exports.run = async (bot, args) => {
 			.addField(
 				'Minutes online',
 				functions.numberWithCommas(Math.round(bot.uptime / 60000))
-			) //Convert to minutes
-			.addField('GitHub', 'https://github.com/Gabolicious/AlfredBot');
+			)
+			.addField('Maintained by', 'The Gamerzs')
+			.addField('Creator', 'Gabo');
 
 		return resolve(botembed);
 	});
