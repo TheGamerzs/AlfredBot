@@ -4,50 +4,39 @@ const botconfig = require('../botconfig.json');
 const functions = require('../util/functions.js');
 
 module.exports.run = async (bot, args) => {
-	return new Promise((resolve, reject) => {
+	return new Promise(async (resolve, reject) => {
 		const ServerStatus = new Discord.MessageEmbed()
 			.setTitle('Uptime of all servers')
 			.setColor('RANDOM');
 
-		function checkServer(index) {
-			//Find people heisting in server
-			if (index < botconfig.ActiveServers.length - 1) {
-				//if its not the last server
-				setTimeout(() => {
-					checkServer(index + 1); //check next one after 200 ms
-				}, 500);
-			} else {
-				//last one
-				setTimeout(() => {
-					resolve(ServerStatus);
-				}, 1000);
-			}
+		const serverPromises = botconfig.ActiveServers.map(server => {
+			return fetch(`http://${server.url}/info.json`)
+				.then(res => res.json())
+				.then(body => {
+					return body;
+				});
+		});
 
-			request(
-				`http://${botconfig.ActiveServers[index].direct}/info.json`,
-				{ json: true },
-				function (error, response, body) {
-					//url to get all players
-					if (error || !body) {
-						//server is offline
-						ServerStatus.addField(
-							botconfig.ActiveServers[index].name,
-							'OFFLINE',
-							true
-						);
-						return;
-					}
-
+		await Promise.allSettled(serverPromises).then(results => {
+			results.forEach((result, index) => {
+				if (result.status === 'fulfilled') {
+					const body = result.value;
 					ServerStatus.addField(
 						botconfig.ActiveServers[index].name,
 						body.vars.Uptime,
 						true
 					);
+				} else {
+					ServerStatus.addField(
+						botconfig.ActiveServers[index].name,
+						'OFFLINE',
+						true
+					);
 				}
-			);
-		}
+			});
+		});
 
-		checkServer(0); //Run recursive function starting at index 0
+		return resolve(ServerStatus);
 	});
 };
 
