@@ -4,6 +4,7 @@ const botconfig = require('../botconfig.json');
 
 module.exports.run = async (bot, args) => {
 	return new Promise(async (resolve, reject) => {
+		return resolve('No catto for you! Catto could not be found! :(');
 		let { body } = await superagent.get(`https://aws.random.cat/meow`); //gets random cat pic
 
 		let catembed = new Discord.MessageEmbed()
