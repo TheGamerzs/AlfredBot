@@ -15,6 +15,7 @@ const con = mysql.createConnection({
 	database: process.env.DB_DATABASE,
 });
 const express = require('express');
+const { re } = require('mathjs/lib/entry/pureFunctionsAny.generated');
 const app = express();
 
 con.connect(function (err) {
@@ -380,100 +381,117 @@ bot.on('ready', async () => {
 	console.log(`${bot.user.username} is online!`); //logs that the bot is online
 	await slashCommands.init(bot);
 
-	bot.channels.cache.get(botconfig.RTSCEOSpamChannel).send('Restarted.'); //Send a message to a channel
+	const slashPromises = [
+		new Promise((resolve, reject) => {
+			fs.readdir('./src/Bothcommands/', async (err, files) => {
+				//Gets all files in the Bothcommands folder
+				const slashCmds = { guild: 'GLOBAL', commands: [] };
+				if (err) return console.log(err);
+				const jsfile = files.filter(f => f.split('.').pop() == 'js'); //only finds files that are .js
+				if (jsfile.length <= 0) {
+					//if there aren't any files in folder
+					console.log("Couldn't find any BOTH commands");
+					return;
+				}
 
-	fs.readdir('./src/Bothcommands/', (err, files) => {
-		//Gets all files in the Bothcommands folder
-		const slashCmds = { guild: 'GLOBAL', commands: [] };
-		if (err) return console.log(err);
-		const jsfile = files.filter(f => f.split('.').pop() == 'js'); //only finds files that are .js
-		if (jsfile.length <= 0) {
-			//if there aren't any files in folder
-			console.log("Couldn't find any BOTH commands");
-			return;
-		}
+				jsfile.forEach((f, i) => {
+					//For each js file in the folder
+					const props = require(`./Bothcommands/${f}`); //loads the file (module.exports)
+					if (props.help.disabled) return;
+					bot.BothCommands.set(props.help.name, props); //adds to the discord collection with key props.help.name and then value props
 
-		jsfile.forEach((f, i) => {
-			//For each js file in the folder
-			const props = require(`./Bothcommands/${f}`); //loads the file (module.exports)
-			if (props.help.disabled) return;
-			bot.BothCommands.set(props.help.name, props); //adds to the discord collection with key props.help.name and then value props
+					if (props.help.aliases) {
+						props.help.aliases.forEach(alias => {
+							bot.BothCommands.set(alias, props);
+						});
+					}
 
-			if (props.help.aliases) {
-				props.help.aliases.forEach(alias => {
-					bot.BothCommands.set(alias, props);
+					if (props.help.slash) {
+						slashCmds.commands.push(props);
+					}
+					console.log(`BOTH ${f} loaded!`); //Logs that it got the file correctly
 				});
-			}
 
-			if (props.help.slash) {
-				slashCmds.commands.push(props);
-			}
-			console.log(`BOTH ${f} loaded!`); //Logs that it got the file correctly
-		});
+				await slashCommands.addCommands(slashCmds);
+				resolve();
+			});
+		}),
 
-		slashCommands.addCommands(slashCmds);
-	});
-	fs.readdir('./src/RTScommands/', (err, files) => {
-		//Gets all files in the RTScommands folder
-		const slashCmds = { guild: 'rts', commands: [] };
+		new Promise((resolve, reject) => {
+			fs.readdir('./src/RTScommands/', async (err, files) => {
+				//Gets all files in the RTScommands folder
+				const slashCmds = { guild: 'rts', commands: [] };
 
-		if (err) console.log(err);
-		const jsfile = files.filter(f => f.split('.').pop() == 'js'); //only finds files that are .js
-		if (jsfile.length <= 0) {
-			//if there aren't any files in folder
-			console.log("Couldn't find RTS commands");
-			return;
-		}
+				if (err) console.log(err);
+				const jsfile = files.filter(f => f.split('.').pop() == 'js'); //only finds files that are .js
+				if (jsfile.length <= 0) {
+					//if there aren't any files in folder
+					console.log("Couldn't find RTS commands");
+					return;
+				}
 
-		jsfile.forEach((f, i) => {
-			//For each js file in the folder
-			const props = require(`./RTScommands/${f}`); //loads the file (module.exports)
-			if (props.help.disabled) return;
-			bot.RTSCommands.set(props.help.name, props); //adds to the discord collection with key props.help.name and then value props
+				jsfile.forEach((f, i) => {
+					//For each js file in the folder
+					const props = require(`./RTScommands/${f}`); //loads the file (module.exports)
+					if (props.help.disabled) return;
+					bot.RTSCommands.set(props.help.name, props); //adds to the discord collection with key props.help.name and then value props
 
-			if (props.help.aliases) {
-				props.help.aliases.forEach(alias => {
-					bot.RTSCommands.set(alias, props);
+					if (props.help.aliases) {
+						props.help.aliases.forEach(alias => {
+							bot.RTSCommands.set(alias, props);
+						});
+					}
+
+					if (props.help.slash) {
+						slashCmds.commands.push(props);
+					}
+					console.log(`RTS ${f} loaded!`); //logs that it got the file correctly
 				});
-			}
 
-			if (props.help.slash) {
-				slashCmds.commands.push(props);
-			}
-			console.log(`RTS ${f} loaded!`); //logs that it got the file correctly
-		});
-		slashCommands.addCommands(slashCmds);
-	});
+				await slashCommands.addCommands(slashCmds);
 
-	fs.readdir('./src/PIGScommands/', (err, files) => {
-		const slashCmds = { guild: 'pigs', commands: [] };
+				resolve();
+			});
+		}),
 
-		if (err) console.log(err);
-		const jsfile = files.filter(f => f.split('.').pop() == 'js'); //Only finds files that are .js
-		if (jsfile.length <= 0) {
-			//if there aren't any files in folder
-			console.log("Couldn't find PIGS commands");
-			return;
-		}
+		new Promise((resolve, reject) => {
+			fs.readdir('./src/PIGScommands/', async (err, files) => {
+				const slashCmds = { guild: 'pigs', commands: [] };
 
-		jsfile.forEach((f, i) => {
-			//For each js file in the folder
-			const props = require(`./PIGScommands/${f}`); //Loads the file (module.exports)
-			if (props.help.disabled) return;
-			bot.PIGSCommands.set(props.help.name, props); //adds to the discord collection with key props.help.name and then value props
+				if (err) console.log(err);
+				const jsfile = files.filter(f => f.split('.').pop() == 'js'); //Only finds files that are .js
+				if (jsfile.length <= 0) {
+					//if there aren't any files in folder
+					console.log("Couldn't find PIGS commands");
+					return;
+				}
 
-			if (props.help.aliases) {
-				props.help.aliases.forEach(alias => {
-					bot.PIGSCommands.set(alias, props);
+				jsfile.forEach((f, i) => {
+					//For each js file in the folder
+					const props = require(`./PIGScommands/${f}`); //Loads the file (module.exports)
+					if (props.help.disabled) return;
+					bot.PIGSCommands.set(props.help.name, props); //adds to the discord collection with key props.help.name and then value props
+
+					if (props.help.aliases) {
+						props.help.aliases.forEach(alias => {
+							bot.PIGSCommands.set(alias, props);
+						});
+					}
+
+					if (props.help.slash) {
+						slashCmds.commands.push(props);
+					}
+					console.log(`PIGS ${f} loaded!`); //Logs that it got the file correctly
 				});
-			}
+				await slashCommands.addCommands(slashCmds);
+				resolve();
+			});
+		}),
+	];
 
-			if (props.help.slash) {
-				slashCmds.commands.push(props);
-			}
-			console.log(`PIGS ${f} loaded!`); //Logs that it got the file correctly
-		});
-		slashCommands.addCommands(slashCmds);
+	Promise.allSettled(slashPromises).then(() => {
+		console.log('All commands loaded!');
+		bot.channels.cache.get(botconfig.RTSCEOSpamChannel).send('Restarted.');
 	});
 
 	setInterval(checkForDxp, 30 * 60000);

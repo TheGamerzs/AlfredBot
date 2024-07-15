@@ -373,466 +373,130 @@ function handleOptions(args) {
 	return options;
 }
 
-slash.addCommands = slashCommands => {
-	let enabledCommands = {};
-	let enabledPerms = {};
-	let guildID;
-	if (slashCommands.guild == 'rts') {
-		guildID = botconfig.RTSServer;
-	} else {
-		guildID = botconfig.PIGSServer;
-	}
-	if (slashCommands.guild == 'GLOBAL') {
-		request.get(
-			`${slash.baseURI}/commands`,
-			{
-				headers: {
-					Authorization: `Bot ${process.env.BOT_TOKEN}`,
-				},
-				json: true,
-			},
-			(err, response, globalCommands) => {
-				if (err) throw err;
-				globalCommands.forEach(cmd => {
-					enabledCommands[cmd.name] = cmd;
-				});
-
-				request.get(
-					`${slash.baseURI}/guilds/${botconfig.RTSServer}/commands/permissions`,
-					{
-						headers: {
-							Authorization: `Bot ${process.env.BOT_TOKEN}`,
-						},
-						json: true,
-					},
-					(err, response, rtsPerms) => {
-						if (err) throw err;
-						enabledPerms['rts'] = {};
-						rtsPerms.forEach(rtsPerm => {
-							enabledPerms['rts'][rtsPerm.id] = rtsPerm.permissions;
-						});
-
-						request.get(
-							`${slash.baseURI}/guilds/${botconfig.PIGSServer}/commands/permissions`,
-							{
-								headers: {
-									Authorization: `Bot ${process.env.BOT_TOKEN}`,
-								},
-								json: true,
-							},
-							(err, response, pigsPerms) => {
-								if (err) throw err;
-								enabledPerms['pigs'] = {};
-								pigsPerms.forEach(pigPerm => {
-									enabledPerms['pigs'][pigPerm.id] = pigPerm.permissions;
-								});
-								addCommand(0);
-							}
-						);
-					}
-				);
-			}
-		);
-	} else {
-		request.get(
-			`${slash.baseURI}/guilds/${guildID}/commands`,
-			{
-				headers: {
-					Authorization: `Bot ${process.env.BOT_TOKEN}`,
-				},
-				json: true,
-			},
-			(err, response, guildCommands) => {
-				if (err) throw err;
-				guildCommands.forEach(cmd => {
-					enabledCommands[cmd.name] = cmd;
-				});
-
-				request.get(
-					`${slash.baseURI}/guilds/${guildID}/commands/permissions`,
-					{
-						headers: {
-							Authorization: `Bot ${process.env.BOT_TOKEN}`,
-						},
-						json: true,
-					},
-					(err, response, guildPerms) => {
-						if (err) throw err;
-						enabledPerms[slashCommands.guild] = {};
-						guildPerms.forEach(guildPerm => {
-							enabledPerms[slashCommands.guild][guildPerm.id] =
-								guildPerm.permissions;
-						});
-						addCommand(0);
-					}
-				);
-			}
-		);
-	}
-
-	function addCommand(i) {
-		const command = slashCommands.commands[i];
-		if (!command) {
-			return cleanUp();
-		}
-
-		let enabledCommand;
-		if (slashCommands.guild == 'GLOBAL') {
-			const cmdOptions = handleOptions(command.help.args);
-			if (enabledCommands[command.help.name]) {
-				enabledCommand = enabledCommands[command.help.name];
-				if (
-					enabledCommand.name != command.help.name ||
-					enabledCommand.description != command.help.description ||
-					enabledCommand.default_permission ||
-					!optionsAreSame(enabledCommand.options ?? [], cmdOptions)
-				) {
-					// Update
-					request.patch(
-						`${slash.baseURI}/commands/${enabledCommand.id}`,
-						{
-							body: {
-								name: command.help.name,
-								description: command.help.description,
-								options: cmdOptions,
-								default_permission: false,
-							},
-							headers: {
-								Authorization: `Bot ${process.env.BOT_TOKEN}`,
-							},
-							json: true,
-						},
-						(err, response, cmd) => {
-							if (err) throw err;
-							if (cmd.message == 'You are being rate limited.') {
-								console.log(`Timeout for ${cmd.retry_after} seconds`);
-								setTimeout(() => {
-									addCommand(i);
-								}, cmd.retry_after * 1000);
-								return;
-							}
-							enabledCommand = cmd;
-							checkPermissions();
-						}
-					);
-				} else {
-					checkPermissions();
-				}
-
-				function checkPermissions() {
-					if (typeof command.help.permission !== 'string') {
-						return nextCommand();
-					}
-
-					const rtscmdPermissions = [
-						{
-							type: 2,
-							id: botconfig.GaboID,
-							permission: true,
-						},
-						{
-							type: 2,
-							id: botconfig.RockID,
-							permission: true,
-						},
-					];
-					const pigscmdPermissions = [
-						{
-							type: 2,
-							id: botconfig.GaboID,
-							permission: true,
-						},
-						{
-							type: 2,
-							id: botconfig.RockID,
-							permission: true,
-						},
-					];
-					command.help.permission.forEach(role => {
-						if (role.server == 'rts') {
-							rtscmdPermissions.push({
-								type: 1,
-								id: role.id,
-								permission: true,
-							});
-						} else {
-							pigscmdPermissions.push({
-								type: 1,
-								id: role.id,
-								permission: true,
-							});
-						}
-					});
-
-					const pigsValid = permsAreSame(
-						pigscmdPermissions,
-						enabledPerms['pigs'][enabledCommand.id]
-					);
-					const rtsValid = permsAreSame(
-						rtscmdPermissions,
-						enabledPerms['rts'][enabledCommand.id]
-					);
-
-					if (pigsValid && rtsValid) {
-						nextCommand();
-					} else if (pigsValid && !rtsValid) {
-						slash.commands[botconfig.PIGSServer][enabledCommand.name] = {
-							...command,
-							id: enabledCommand.id,
-						};
-						addPermissions('rts');
-					} else if (!pigsValid && rtsValid) {
-						slash.commands[botconfig.RTSServer][enabledCommand.name] = {
-							...command,
-							id: enabledCommand.id,
-						};
-						addPermissions('pigs');
-					} else {
-						addPermissions('global');
-					}
-				}
-
-				function nextCommand() {
-					slash.commands[botconfig.RTSServer][enabledCommand.name] = {
-						...command,
-						id: enabledCommand.id,
-					};
-					slash.commands[botconfig.PIGSServer][enabledCommand.name] = {
-						...command,
-						id: enabledCommand.id,
-					};
-
-					console.log(`Registered GLOBAL /${enabledCommand.name}`);
-					delete enabledCommands[command.help.name];
-					addCommand(i + 1);
-				}
-			} else {
-				// Create
-				request.post(
-					`${slash.baseURI}/commands`,
-					{
-						body: {
-							name: command.help.name,
-							description: command.help.description,
-							options: cmdOptions,
-							default_permission: false,
-						},
-						headers: {
-							Authorization: `Bot ${process.env.BOT_TOKEN}`,
-						},
-						json: true,
-					},
-					(err, response, cmd) => {
-						if (err) throw err;
-						if (cmd.message == 'You are being rate limited.') {
-							console.log(`Timeout for ${cmd.retry_after} seconds`);
-							setTimeout(() => {
-								addCommand(i);
-							}, cmd.retry_after * 1000);
-							return;
-						}
-						enabledCommand = cmd;
-						addPermissions('global');
-					}
-				);
-			}
+slash.addCommands = async slashCommands => {
+	return new Promise((resolve, reject) => {
+		let enabledCommands = {};
+		let enabledPerms = {};
+		let guildID;
+		if (slashCommands.guild == 'rts') {
+			guildID = botconfig.RTSServer;
 		} else {
-			const cmdOptions = handleOptions(command.help.args);
+			guildID = botconfig.PIGSServer;
+		}
+		if (slashCommands.guild == 'GLOBAL') {
+			request.get(
+				`${slash.baseURI}/commands`,
+				{
+					headers: {
+						Authorization: `Bot ${process.env.BOT_TOKEN}`,
+					},
+					json: true,
+				},
+				(err, response, globalCommands) => {
+					if (err) throw err;
+					globalCommands.forEach(cmd => {
+						enabledCommands[cmd.name] = cmd;
+					});
 
-			if (enabledCommands[command.help.name]) {
-				enabledCommand = enabledCommands[command.help.name];
-				if (
-					enabledCommand.name != command.help.name ||
-					enabledCommand.description != command.help.description ||
-					enabledCommand.default_permission ||
-					!optionsAreSame(enabledCommand.options ?? [], cmdOptions)
-				) {
-					// Update
-					request.patch(
-						`${slash.baseURI}/guilds/${guildID}/commands/${enabledCommand.id}`,
+					request.get(
+						`${slash.baseURI}/guilds/${botconfig.RTSServer}/commands/permissions`,
 						{
-							body: {
-								name: command.help.name,
-								description: command.help.description,
-								options: cmdOptions,
-								default_permission: false,
-							},
 							headers: {
 								Authorization: `Bot ${process.env.BOT_TOKEN}`,
 							},
 							json: true,
 						},
-						(err, response, cmd) => {
+						(err, response, rtsPerms) => {
 							if (err) throw err;
-							if (cmd.message == 'You are being rate limited.') {
-								console.log(`Timeout for ${cmd.retry_after} seconds`);
-								setTimeout(() => {
-									addCommand(i);
-								}, cmd.retry_after * 1000);
-								return;
-							}
-							enabledCommand = cmd;
-							checkPermissions();
+							enabledPerms['rts'] = {};
+							rtsPerms.forEach(rtsPerm => {
+								enabledPerms['rts'][rtsPerm.id] = rtsPerm.permissions;
+							});
+
+							request.get(
+								`${slash.baseURI}/guilds/${botconfig.PIGSServer}/commands/permissions`,
+								{
+									headers: {
+										Authorization: `Bot ${process.env.BOT_TOKEN}`,
+									},
+									json: true,
+								},
+								(err, response, pigsPerms) => {
+									if (err) throw err;
+									enabledPerms['pigs'] = {};
+									pigsPerms.forEach(pigPerm => {
+										enabledPerms['pigs'][pigPerm.id] = pigPerm.permissions;
+									});
+									addCommand(0);
+								}
+							);
 						}
 					);
-				} else {
-					checkPermissions();
 				}
-
-				function checkPermissions() {
-					if (typeof command.help.permission !== 'string') {
-						return nextCommand();
-					}
-
-					const cmdPermissions = [
-						{
-							type: 2,
-							id: botconfig.GaboID,
-							permission: true,
-						},
-						{
-							type: 2,
-							id: botconfig.RockID,
-							permission: true,
-						},
-					];
-					command.help.permission.forEach(role => {
-						if (role.server == slashCommands.guild) {
-							cmdPermissions.push({
-								type: 1,
-								id: role.id,
-								permission: true,
-							});
-						}
+			);
+		} else {
+			request.get(
+				`${slash.baseURI}/guilds/${guildID}/commands`,
+				{
+					headers: {
+						Authorization: `Bot ${process.env.BOT_TOKEN}`,
+					},
+					json: true,
+				},
+				(err, response, guildCommands) => {
+					if (err) throw err;
+					guildCommands.forEach(cmd => {
+						enabledCommands[cmd.name] = cmd;
 					});
 
-					if (
-						permsAreSame(
-							cmdPermissions,
-							enabledPerms[slashCommands.guild][enabledCommand.id]
-						)
-					) {
-						nextCommand();
-					} else {
-						addPermissions(slashCommands.guild);
-					}
-				}
-
-				function nextCommand() {
-					slash.commands[guildID][enabledCommand.name] = {
-						...command,
-						id: enabledCommand.id,
-					};
-
-					console.log(
-						`Registered ${slashCommands.guild} /${enabledCommand.name}`
-					);
-					delete enabledCommands[command.help.name];
-					addCommand(i + 1);
-				}
-			} else {
-				// Create
-				request.post(
-					`${slash.baseURI}/guilds/${guildID}/commands`,
-					{
-						body: {
-							name: command.help.name,
-							description: command.help.description,
-							options: cmdOptions,
-							default_permission: false,
+					request.get(
+						`${slash.baseURI}/guilds/${guildID}/commands/permissions`,
+						{
+							headers: {
+								Authorization: `Bot ${process.env.BOT_TOKEN}`,
+							},
+							json: true,
 						},
-						headers: {
-							Authorization: `Bot ${process.env.BOT_TOKEN}`,
-						},
-						json: true,
-					},
-					(err, response, cmd) => {
-						if (err) throw err;
-						if (cmd.message == 'You are being rate limited.') {
-							console.log(`Timeout for ${cmd.retry_after} seconds`);
-							setTimeout(() => {
-								addCommand(i);
-							}, cmd.retry_after * 1000);
-							return;
+						(err, response, guildPerms) => {
+							if (err) throw err;
+							enabledPerms[slashCommands.guild] = {};
+							guildPerms.forEach(guildPerm => {
+								enabledPerms[slashCommands.guild][guildPerm.id] =
+									guildPerm.permissions;
+							});
+							addCommand(0);
 						}
-						enabledCommand = cmd;
-						addPermissions(slashCommands.guild);
-					}
-				);
-			}
+					);
+				}
+			);
 		}
 
-		function addPermissions(server) {
-			const rtscmdPermissions = [
-				{
-					type: 2,
-					id: botconfig.GaboID,
-					permission: true,
-				},
-				{
-					type: 2,
-					id: botconfig.RockID,
-					permission: true,
-				},
-			];
-			const pigscmdPermissions = [
-				{
-					type: 2,
-					id: botconfig.GaboID,
-					permission: true,
-				},
-				{
-					type: 2,
-					id: botconfig.RockID,
-					permission: true,
-				},
-			];
-			command.help.permission.forEach(role => {
-				if (role.server == 'rts') {
-					rtscmdPermissions.push({
-						type: 1,
-						id: role.id,
-						permission: true,
-					});
-				} else {
-					pigscmdPermissions.push({
-						type: 1,
-						id: role.id,
-						permission: true,
-					});
-				}
-			});
+		function addCommand(i) {
+			const command = slashCommands.commands[i];
+			if (!command) {
+				return cleanUp();
+			}
 
-			if (server == 'global') {
-				request.put(
-					`${slash.baseURI}/guilds/${botconfig.RTSServer}/commands/${enabledCommand.id}/permissions`,
-					{
-						body: {
-							permissions: rtscmdPermissions,
-						},
-						headers: {
-							Authorization: `Bot ${process.env.BOT_TOKEN}`,
-						},
-						json: true,
-					},
-					(err, response, body) => {
-						if (err) throw err;
-						if (body.message == 'You are being rate limited.') {
-							console.log(`Timeout for ${body.retry_after} seconds`);
-							setTimeout(() => {
-								addPermissions('global');
-							}, body.retry_after * 1000);
-							return;
-						}
-						slash.commands[botconfig.RTSServer][enabledCommand.name] = {
-							...command,
-							id: enabledCommand.id,
-						};
-						request.put(
-							`${slash.baseURI}/guilds/${botconfig.PIGSServer}/commands/${enabledCommand.id}/permissions`,
+			let enabledCommand;
+			if (slashCommands.guild == 'GLOBAL') {
+				const cmdOptions = handleOptions(command.help.args);
+				if (enabledCommands[command.help.name]) {
+					enabledCommand = enabledCommands[command.help.name];
+					if (
+						enabledCommand.name != command.help.name ||
+						enabledCommand.description != command.help.description ||
+						enabledCommand.default_permission ||
+						!optionsAreSame(enabledCommand.options ?? [], cmdOptions)
+					) {
+						// Update
+						request.patch(
+							`${slash.baseURI}/commands/${enabledCommand.id}`,
 							{
 								body: {
-									permissions: pigscmdPermissions,
+									name: command.help.name,
+									description: command.help.description,
+									options: cmdOptions,
+									default_permission: false,
 								},
 								headers: {
 									Authorization: `Bot ${process.env.BOT_TOKEN}`,
@@ -844,130 +508,469 @@ slash.addCommands = slashCommands => {
 								if (cmd.message == 'You are being rate limited.') {
 									console.log(`Timeout for ${cmd.retry_after} seconds`);
 									setTimeout(() => {
-										addPermissions('pigs');
+										addCommand(i);
 									}, cmd.retry_after * 1000);
 									return;
 								}
-								slash.commands[botconfig.PIGSServer][enabledCommand.name] = {
-									...command,
-									id: enabledCommand.id,
-								};
-
-								console.log(
-									`Updated global perms and registered ${slashCommands.guild} /${enabledCommand.name}`
-								);
-								delete enabledCommands[command.help.name];
-								addCommand(i + 1);
+								enabledCommand = cmd;
+								checkPermissions();
 							}
 						);
+					} else {
+						checkPermissions();
 					}
-				);
-			} else if (server == 'pigs') {
-				request.put(
-					`${slash.baseURI}/guilds/${botconfig.PIGSServer}/commands/${enabledCommand.id}/permissions`,
-					{
-						body: {
-							permissions: pigscmdPermissions,
-						},
-						headers: {
-							Authorization: `Bot ${process.env.BOT_TOKEN}`,
-						},
-						json: true,
-					},
-					(err, response, body) => {
-						if (err) throw err;
-						if (body.message == 'You are being rate limited.') {
-							console.log(`Timeout for ${body.retry_after} seconds`);
-							setTimeout(() => {
-								addPermissions('pigs');
-							}, body.retry_after * 1000);
-							return;
+
+					function checkPermissions() {
+						if (typeof command.help.permission !== 'string') {
+							return nextCommand();
 						}
+
+						const rtscmdPermissions = [
+							{
+								type: 2,
+								id: botconfig.GaboID,
+								permission: true,
+							},
+							{
+								type: 2,
+								id: botconfig.RockID,
+								permission: true,
+							},
+						];
+						const pigscmdPermissions = [
+							{
+								type: 2,
+								id: botconfig.GaboID,
+								permission: true,
+							},
+							{
+								type: 2,
+								id: botconfig.RockID,
+								permission: true,
+							},
+						];
+						command.help.permission.forEach(role => {
+							if (role.server == 'rts') {
+								rtscmdPermissions.push({
+									type: 1,
+									id: role.id,
+									permission: true,
+								});
+							} else {
+								pigscmdPermissions.push({
+									type: 1,
+									id: role.id,
+									permission: true,
+								});
+							}
+						});
+
+						const pigsValid = permsAreSame(
+							pigscmdPermissions,
+							enabledPerms['pigs'][enabledCommand.id]
+						);
+						const rtsValid = permsAreSame(
+							rtscmdPermissions,
+							enabledPerms['rts'][enabledCommand.id]
+						);
+
+						if (pigsValid && rtsValid) {
+							nextCommand();
+						} else if (pigsValid && !rtsValid) {
+							slash.commands[botconfig.PIGSServer][enabledCommand.name] = {
+								...command,
+								id: enabledCommand.id,
+							};
+							addPermissions('rts');
+						} else if (!pigsValid && rtsValid) {
+							slash.commands[botconfig.RTSServer][enabledCommand.name] = {
+								...command,
+								id: enabledCommand.id,
+							};
+							addPermissions('pigs');
+						} else {
+							addPermissions('global');
+						}
+					}
+
+					function nextCommand() {
+						slash.commands[botconfig.RTSServer][enabledCommand.name] = {
+							...command,
+							id: enabledCommand.id,
+						};
 						slash.commands[botconfig.PIGSServer][enabledCommand.name] = {
 							...command,
 							id: enabledCommand.id,
 						};
 
-						console.log(
-							`Updated pigs perms and registered ${slashCommands.guild} /${enabledCommand.name}`
-						);
+						console.log(`Registered GLOBAL /${enabledCommand.name}`);
 						delete enabledCommands[command.help.name];
 						addCommand(i + 1);
 					}
-				);
-			} else {
-				request.put(
-					`${slash.baseURI}/guilds/${botconfig.RTSServer}/commands/${enabledCommand.id}/permissions`,
-					{
-						body: {
-							permissions: rtscmdPermissions,
+				} else {
+					// Create
+					request.post(
+						`${slash.baseURI}/commands`,
+						{
+							body: {
+								name: command.help.name,
+								description: command.help.description,
+								options: cmdOptions,
+								default_permission: false,
+							},
+							headers: {
+								Authorization: `Bot ${process.env.BOT_TOKEN}`,
+							},
+							json: true,
 						},
-						headers: {
-							Authorization: `Bot ${process.env.BOT_TOKEN}`,
-						},
-						json: true,
-					},
-					(err, response, body) => {
-						if (err) throw err;
-						if (body.message == 'You are being rate limited.') {
-							console.log(`Timeout for ${body.retry_after} seconds`);
-							setTimeout(() => {
-								addPermissions('rts');
-							}, body.retry_after * 1000);
-							return;
+						(err, response, cmd) => {
+							if (err) throw err;
+							if (cmd.message == 'You are being rate limited.') {
+								console.log(`Timeout for ${cmd.retry_after} seconds`);
+								setTimeout(() => {
+									addCommand(i);
+								}, cmd.retry_after * 1000);
+								return;
+							}
+							enabledCommand = cmd;
+							addPermissions('global');
 						}
-						slash.commands[botconfig.RTSServer][enabledCommand.name] = {
+					);
+				}
+			} else {
+				const cmdOptions = handleOptions(command.help.args);
+
+				if (enabledCommands[command.help.name]) {
+					enabledCommand = enabledCommands[command.help.name];
+					if (
+						enabledCommand.name != command.help.name ||
+						enabledCommand.description != command.help.description ||
+						enabledCommand.default_permission ||
+						!optionsAreSame(enabledCommand.options ?? [], cmdOptions)
+					) {
+						// Update
+						request.patch(
+							`${slash.baseURI}/guilds/${guildID}/commands/${enabledCommand.id}`,
+							{
+								body: {
+									name: command.help.name,
+									description: command.help.description,
+									options: cmdOptions,
+									default_permission: false,
+								},
+								headers: {
+									Authorization: `Bot ${process.env.BOT_TOKEN}`,
+								},
+								json: true,
+							},
+							(err, response, cmd) => {
+								if (err) throw err;
+								if (cmd.message == 'You are being rate limited.') {
+									console.log(`Timeout for ${cmd.retry_after} seconds`);
+									setTimeout(() => {
+										addCommand(i);
+									}, cmd.retry_after * 1000);
+									return;
+								}
+								enabledCommand = cmd;
+								checkPermissions();
+							}
+						);
+					} else {
+						checkPermissions();
+					}
+
+					function checkPermissions() {
+						if (typeof command.help.permission !== 'string') {
+							return nextCommand();
+						}
+
+						const cmdPermissions = [
+							{
+								type: 2,
+								id: botconfig.GaboID,
+								permission: true,
+							},
+							{
+								type: 2,
+								id: botconfig.RockID,
+								permission: true,
+							},
+						];
+						command.help.permission.forEach(role => {
+							if (role.server == slashCommands.guild) {
+								cmdPermissions.push({
+									type: 1,
+									id: role.id,
+									permission: true,
+								});
+							}
+						});
+
+						if (
+							permsAreSame(
+								cmdPermissions,
+								enabledPerms[slashCommands.guild][enabledCommand.id]
+							)
+						) {
+							nextCommand();
+						} else {
+							addPermissions(slashCommands.guild);
+						}
+					}
+
+					function nextCommand() {
+						slash.commands[guildID][enabledCommand.name] = {
 							...command,
 							id: enabledCommand.id,
 						};
 
 						console.log(
-							`Updated rts perms and registered ${slashCommands.guild} /${enabledCommand.name}`
+							`Registered ${slashCommands.guild} /${enabledCommand.name}`
 						);
 						delete enabledCommands[command.help.name];
-
 						addCommand(i + 1);
 					}
-				);
+				} else {
+					// Create
+					request.post(
+						`${slash.baseURI}/guilds/${guildID}/commands`,
+						{
+							body: {
+								name: command.help.name,
+								description: command.help.description,
+								options: cmdOptions,
+								default_permission: false,
+							},
+							headers: {
+								Authorization: `Bot ${process.env.BOT_TOKEN}`,
+							},
+							json: true,
+						},
+						(err, response, cmd) => {
+							if (err) throw err;
+							if (cmd.message == 'You are being rate limited.') {
+								console.log(`Timeout for ${cmd.retry_after} seconds`);
+								setTimeout(() => {
+									addCommand(i);
+								}, cmd.retry_after * 1000);
+								return;
+							}
+							enabledCommand = cmd;
+							addPermissions(slashCommands.guild);
+						}
+					);
+				}
+			}
+
+			function addPermissions(server) {
+				const rtscmdPermissions = [
+					{
+						type: 2,
+						id: botconfig.GaboID,
+						permission: true,
+					},
+					{
+						type: 2,
+						id: botconfig.RockID,
+						permission: true,
+					},
+				];
+				const pigscmdPermissions = [
+					{
+						type: 2,
+						id: botconfig.GaboID,
+						permission: true,
+					},
+					{
+						type: 2,
+						id: botconfig.RockID,
+						permission: true,
+					},
+				];
+				command.help.permission.forEach(role => {
+					if (role.server == 'rts') {
+						rtscmdPermissions.push({
+							type: 1,
+							id: role.id,
+							permission: true,
+						});
+					} else {
+						pigscmdPermissions.push({
+							type: 1,
+							id: role.id,
+							permission: true,
+						});
+					}
+				});
+
+				if (server == 'global') {
+					request.put(
+						`${slash.baseURI}/guilds/${botconfig.RTSServer}/commands/${enabledCommand.id}/permissions`,
+						{
+							body: {
+								permissions: rtscmdPermissions,
+							},
+							headers: {
+								Authorization: `Bot ${process.env.BOT_TOKEN}`,
+							},
+							json: true,
+						},
+						(err, response, body) => {
+							if (err) throw err;
+							if (body.message == 'You are being rate limited.') {
+								console.log(`Timeout for ${body.retry_after} seconds`);
+								setTimeout(() => {
+									addPermissions('global');
+								}, body.retry_after * 1000);
+								return;
+							}
+							slash.commands[botconfig.RTSServer][enabledCommand.name] = {
+								...command,
+								id: enabledCommand.id,
+							};
+							request.put(
+								`${slash.baseURI}/guilds/${botconfig.PIGSServer}/commands/${enabledCommand.id}/permissions`,
+								{
+									body: {
+										permissions: pigscmdPermissions,
+									},
+									headers: {
+										Authorization: `Bot ${process.env.BOT_TOKEN}`,
+									},
+									json: true,
+								},
+								(err, response, cmd) => {
+									if (err) throw err;
+									if (cmd.message == 'You are being rate limited.') {
+										console.log(`Timeout for ${cmd.retry_after} seconds`);
+										setTimeout(() => {
+											addPermissions('pigs');
+										}, cmd.retry_after * 1000);
+										return;
+									}
+									slash.commands[botconfig.PIGSServer][enabledCommand.name] = {
+										...command,
+										id: enabledCommand.id,
+									};
+
+									console.log(
+										`Updated global perms and registered ${slashCommands.guild} /${enabledCommand.name}`
+									);
+									delete enabledCommands[command.help.name];
+									addCommand(i + 1);
+								}
+							);
+						}
+					);
+				} else if (server == 'pigs') {
+					request.put(
+						`${slash.baseURI}/guilds/${botconfig.PIGSServer}/commands/${enabledCommand.id}/permissions`,
+						{
+							body: {
+								permissions: pigscmdPermissions,
+							},
+							headers: {
+								Authorization: `Bot ${process.env.BOT_TOKEN}`,
+							},
+							json: true,
+						},
+						(err, response, body) => {
+							if (err) throw err;
+							if (body.message == 'You are being rate limited.') {
+								console.log(`Timeout for ${body.retry_after} seconds`);
+								setTimeout(() => {
+									addPermissions('pigs');
+								}, body.retry_after * 1000);
+								return;
+							}
+							slash.commands[botconfig.PIGSServer][enabledCommand.name] = {
+								...command,
+								id: enabledCommand.id,
+							};
+
+							console.log(
+								`Updated pigs perms and registered ${slashCommands.guild} /${enabledCommand.name}`
+							);
+							delete enabledCommands[command.help.name];
+							addCommand(i + 1);
+						}
+					);
+				} else {
+					request.put(
+						`${slash.baseURI}/guilds/${botconfig.RTSServer}/commands/${enabledCommand.id}/permissions`,
+						{
+							body: {
+								permissions: rtscmdPermissions,
+							},
+							headers: {
+								Authorization: `Bot ${process.env.BOT_TOKEN}`,
+							},
+							json: true,
+						},
+						(err, response, body) => {
+							if (err) throw err;
+							if (body.message == 'You are being rate limited.') {
+								console.log(`Timeout for ${body.retry_after} seconds`);
+								setTimeout(() => {
+									addPermissions('rts');
+								}, body.retry_after * 1000);
+								return;
+							}
+							slash.commands[botconfig.RTSServer][enabledCommand.name] = {
+								...command,
+								id: enabledCommand.id,
+							};
+
+							console.log(
+								`Updated rts perms and registered ${slashCommands.guild} /${enabledCommand.name}`
+							);
+							delete enabledCommands[command.help.name];
+
+							addCommand(i + 1);
+						}
+					);
+				}
 			}
 		}
-	}
 
-	function cleanUp() {
-		for (const cmdName in enabledCommands) {
-			const id = enabledCommands[cmdName].id;
-			console.log(`DELETING ${cmdName}`);
-			if (slashCommands.guild == 'GLOBAL') {
-				request.delete(
-					`${slash.baseURI}/commands/${id}`,
-					{
-						headers: {
-							Authorization: `Bot ${process.env.BOT_TOKEN}`,
+		function cleanUp() {
+			for (const cmdName in enabledCommands) {
+				const id = enabledCommands[cmdName].id;
+				console.log(`DELETING ${cmdName}`);
+				if (slashCommands.guild == 'GLOBAL') {
+					request.delete(
+						`${slash.baseURI}/commands/${id}`,
+						{
+							headers: {
+								Authorization: `Bot ${process.env.BOT_TOKEN}`,
+							},
+							json: true,
 						},
-						json: true,
-					},
-					(err, response, body) => {
-						if (err) throw err;
-					}
-				);
-			} else {
-				request.delete(
-					`${slash.baseURI}/guilds/${guildID}/commands/${id}`,
-					{
-						headers: {
-							Authorization: `Bot ${process.env.BOT_TOKEN}`,
+						(err, response, body) => {
+							if (err) throw err;
+						}
+					);
+				} else {
+					request.delete(
+						`${slash.baseURI}/guilds/${guildID}/commands/${id}`,
+						{
+							headers: {
+								Authorization: `Bot ${process.env.BOT_TOKEN}`,
+							},
+							json: true,
 						},
-						json: true,
-					},
-					(err, response, body) => {
-						if (err) throw err;
-					}
-				);
+						(err, response, body) => {
+							if (err) throw err;
+						}
+					);
+				}
 			}
-		}
 
-		console.log(`Finished registering ${slashCommands.guild} slash commands`);
-	}
+			console.log(`Finished registering ${slashCommands.guild} slash commands`);
+			resolve();
+		}
+	});
 };
 
 module.exports = slash;
