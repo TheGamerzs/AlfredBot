@@ -6,16 +6,18 @@ module.exports.run = async (bot, args) => {
 		const errors = [];
 		const D2 = new Date(); //curent date
 
+		let InactiveRole, guild, CompanyName;
+
 		if (args.guild_id == botconfig.PIGSServer) {
 			//Pigs server
-			var InactiveRole = botconfig.PIGSRoles.InactiveRole;
-			var guild = bot.guilds.cache.get(botconfig.PIGSServer);
-			var CompanyName = 'pigs';
+			InactiveRole = botconfig.PIGSRoles.InactiveRole;
+			guild = bot.guilds.cache.get(botconfig.PIGSServer);
+			CompanyName = 'pigs';
 		} else if (args.guild_id == botconfig.RTSServer) {
 			//rts server
-			var InactiveRole = botconfig.RTSRoles.InactiveRole;
-			var guild = bot.guilds.cache.get(botconfig.RTSServer);
-			var CompanyName = 'rts';
+			InactiveRole = botconfig.RTSRoles.InactiveRole;
+			guild = bot.guilds.cache.get(botconfig.RTSServer);
+			CompanyName = 'rts';
 		}
 		bot.con.query(
 			`SELECT discord_id, deadline, in_game_name, last_turnin, company FROM members WHERE company = '${CompanyName}'`,

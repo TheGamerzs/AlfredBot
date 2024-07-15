@@ -10,6 +10,9 @@ module.exports.run = async (bot, args) => {
 	return new Promise((resolve, reject) => {
 		if (!args.sub_command)
 			return resolve(`Invalid supplied arguments. Usage: ${this.help.usage}`);
+
+		let company;
+
 		if (args.sub_command_group.toLowerCase() == 'total') {
 			if (args.sub_command.toLowerCase() == 'days') {
 				const Threshold = new Date();
@@ -99,9 +102,9 @@ module.exports.run = async (bot, args) => {
 			}
 			return;
 		} else if (args.sub_command_group.toLowerCase() == 'rts') {
-			var company = 'rts';
+			company = 'rts';
 		} else if (args.sub_command_group.toLowerCase() == 'pigs') {
-			var company = 'pigs';
+			company = 'pigs';
 		}
 
 		if (args.sub_command.toLowerCase() == 'days') {

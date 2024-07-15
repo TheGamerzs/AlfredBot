@@ -2,12 +2,13 @@ const botconfig = require('../botconfig.json');
 
 module.exports.run = async (bot, args) => {
 	return new Promise((resolve, reject) => {
+		let CompanyName;
 		if (args.guild_id == botconfig.PIGSServer) {
 			//PIGS server
-			var CompanyName = 'pigs';
+			CompanyName = 'pigs';
 		} else if (args.guild_id == botconfig.RTSServer) {
 			//rts server
-			var CompanyName = 'rts';
+			CompanyName = 'rts';
 		}
 
 		bot.con.query(

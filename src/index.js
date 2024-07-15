@@ -725,11 +725,13 @@ async function ProcessMessage(message) {
 	// }
 	if (!message.content.startsWith(prefix)) return; //if it doesn't start with the prefix
 
+	let commandfile;
+
 	if (message.guild.id == botconfig.RTSServer) {
 		//if said in the rts server
 		const AllowedRTSCommands = ['.status', '.8ball', '.ud', '.hello']; // commands you can do outside of bot channels
 
-		var commandfile = bot.RTSCommands.get(cmd.slice(prefix.length)); //Trys to get a rts command with the specified cmd without the prefix
+		commandfile = bot.RTSCommands.get(cmd.slice(prefix.length)); //Trys to get a rts command with the specified cmd without the prefix
 		if (
 			commandfile &&
 			message.channel.id != botconfig.RTSPublicBotCommandsChannel &&
@@ -747,7 +749,7 @@ async function ProcessMessage(message) {
 		//if said in the pigs server
 		const AllowedPIGSCommands = ['.status', '.8ball', '.ud', '.hello'];
 
-		var commandfile = bot.PIGSCommands.get(cmd.slice(prefix.length)); // try to get a pigs command with the specified cmd without the prefix
+		commandfile = bot.PIGSCommands.get(cmd.slice(prefix.length)); // try to get a pigs command with the specified cmd without the prefix
 		if (
 			commandfile &&
 			message.channel.id != '511853214858084364' &&
@@ -763,7 +765,7 @@ async function ProcessMessage(message) {
 	}
 	if (!commandfile) {
 		//if theres isn't a pigs or rts command
-		var commandfile = bot.BothCommands.get(cmd.slice(prefix.length)); //try to get a both server command with the specified cmd without the prefix
+		commandfile = bot.BothCommands.get(cmd.slice(prefix.length)); //try to get a both server command with the specified cmd without the prefix
 		if (commandfile) console.log('BOTH', commandfile.help.name, args); //logs that theres a command file
 	}
 	if (commandfile) {
