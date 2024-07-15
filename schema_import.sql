@@ -193,9 +193,9 @@ CREATE TABLE `website` (
 
 -- Dump completed on 2022-05-13 14:00:05
 
-DROP TABLE IF EXISTS `vehicleMod`;
+DROP TABLE IF EXISTS `vehiclemod`;
 
-CREATE TABLE `vehicleMod` (
+CREATE TABLE `vehiclemod` (
   `mod_hash` VARCHAR(50) NOT NULL,
     `vehicle_name` VARCHAR(150) NOT NULL,
     `class` VARCHAR(50) DEFAULT NULL,
@@ -205,13 +205,13 @@ CREATE TABLE `vehicleMod` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Drop the trigger if it exists
-DROP TRIGGER IF EXISTS `before_insert_vehicleMod`;
+DROP TRIGGER IF EXISTS `before_insert_vehiclemod`;
 
 -- Create the trigger
 DELIMITER //
 
-CREATE TRIGGER `before_insert_vehicleMod`
-BEFORE INSERT ON `vehicleMod`
+CREATE TRIGGER `before_insert_vehiclemod`
+BEFORE INSERT ON `vehiclemod`
 FOR EACH ROW
 BEGIN
   SET NEW.mod_hash = MD5(CONCAT(NEW.vehicle_name, NEW.mod));
