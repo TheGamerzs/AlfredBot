@@ -12,7 +12,7 @@ module.exports.run = async (bot, args) => {
 		); //Get their member info
 		if (!MemberInfo) return resolve("Couldn't find that user"); //no member data
 
-		return resolve(`Your deadline: ${MemberInfo.deadline}`); //get the deadline and send it
+		return resolve(`Your deadline was: ${MemberInfo.deadline}`); //get the deadline and send it
 	});
 };
 
