@@ -13,7 +13,8 @@ module.exports.run = async (bot, args) => {
 			.setDescription('***Bot Information***')
 			.setColor('#15f153')
 			.setThumbnail(bicon)
-			.addField('Created By', 'Gabo')
+			.addField('Maintained by', 'The Gamerzs')
+
 			.addField('Created On', bot.user.createdAt)
 			.addField('Memery Used in MB', functions.numberWithCommas(memberused))
 			.addField('Ping', bot.ws.ping)
@@ -21,8 +22,7 @@ module.exports.run = async (bot, args) => {
 				'Minutes online',
 				functions.numberWithCommas(Math.round(bot.uptime / 60000))
 			)
-			.addField('Maintained by', 'The Gamerzs')
-			.addField('Creator', 'Gabo');
+			.addField('Created by', 'Gabo');
 
 		return resolve(botembed);
 	});
