@@ -8,4 +8,3 @@ credentials.json
 tokens.json
 /creds/
 .env
-google_client_secret.json

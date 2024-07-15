@@ -1,6 +1,4 @@
-const authentication = require('../util/authentication');
 const botconfig = require('../botconfig.json');
-const functions = require('../util/functions.js');
 
 module.exports.run = async (bot, args) => {
 	return new Promise((resolve, reject) => {

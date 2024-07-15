@@ -4,9 +4,7 @@ const Discord = require('discord.js');
 const request = require('request');
 const fs = require('fs');
 const mysql = require('mysql');
-const authentication = require('./util/authentication');
 const slashCommands = require('./slash');
-const { google } = require('googleapis'); //allows you to use googles api
 const con = mysql.createConnection({
 	//connect to database
 	host: process.env.DB_HOST,
@@ -15,7 +13,6 @@ const con = mysql.createConnection({
 	database: process.env.DB_DATABASE,
 });
 const express = require('express');
-const { re } = require('mathjs/lib/entry/pureFunctionsAny.generated');
 const app = express();
 
 con.connect(function (err) {
@@ -933,136 +930,6 @@ bot.on('message', async message => {
 				bot.channels.cache.get(botconfig.PIGSLogs).send(GlitchEmbed); //if its in pigs send to pigs logs
 		}
 	});
-});
-let LatestFeedID = 0;
-bot.on('message', async message => {
-	if (message.partial) await message.fetch();
-	if (
-		message.channel.id == '630947095456514077' &&
-		(message.author.id == '404650985529540618' ||
-			message.author.id == '330000865215643658' ||
-			message.author.id == '453742447483158539')
-	) {
-		if (parseInt(message.content)) {
-			authentication.authenticate().then(async auth => {
-				const sheets = google.sheets({
-					version: 'v4',
-					auth,
-				});
-
-				sheets.spreadsheets.values.append(
-					{
-						//append all the hired people
-						auth: auth,
-						spreadsheetId: process.env.BABY_SHEET,
-						range: 'B3:D9999',
-						valueInputOption: 'USER_ENTERED',
-						insertDataOption: 'OVERWRITE',
-						includeValuesInResponse: true,
-						resource: {
-							majorDimension: 'ROWS',
-							values: [
-								[
-									new Date().toDateString(),
-									new Date().toLocaleTimeString(),
-									message.content,
-								],
-							],
-						},
-					},
-					function (err, response) {
-						if (err) return console.log(err);
-						message.channel.send('GOO GOO GAA GAA THANKS FOR THE SUSTENANCE');
-
-						sheets.spreadsheets.values.batchGet(
-							{
-								//get spreadsheet range
-								spreadsheetId: process.env.BABY_SHEET,
-								ranges: ['H2', 'J2', 'J5'],
-								valueRenderOption: 'UNFORMATTED_VALUE',
-								dateTimeRenderOption: 'FORMATTED_STRING',
-								auth: auth,
-							},
-							(err, res) => {
-								if (err) {
-									channel.send(`The API returned an ${err}`);
-									return;
-								}
-								const FoodThresh = res.data.valueRanges[0].values[0];
-								const SoonPing = res.data.valueRanges[1].values[0] * 60000;
-								const LongPing = res.data.valueRanges[2].values[0] * 60000;
-
-								const FeedID = LatestFeedID + 1;
-
-								LatestFeedID = FeedID;
-
-								if (parseInt(message.content) < FoodThresh) {
-									setTimeout(() => {
-										if (LatestFeedID == FeedID)
-											message.channel.send(
-												'<@453742447483158539> GOO GOO GAA GAA FEED ME IM STARVING'
-											);
-									}, SoonPing);
-								} else {
-									setTimeout(() => {
-										if (LatestFeedID == FeedID)
-											message.channel.send(
-												'<@453742447483158539> GOOD GOOD GAA GAA FEED ME IN GONNA DIE SOON'
-											);
-									}, LongPing);
-								}
-							}
-						);
-					}
-				);
-			});
-			return;
-		}
-		switch (message.content.toLowerCase()) {
-			case 'recent':
-				authentication.authenticate().then(async auth => {
-					const sheets = google.sheets({
-						version: 'v4',
-						auth,
-					});
-
-					sheets.spreadsheets.values.get(
-						{
-							//get spreadsheet range
-							spreadsheetId: process.env.BABY_SHEET,
-							range: 'B3:D9999',
-						},
-						(err, res) => {
-							if (err) {
-								channel.send(`The API returned an ${err}`);
-								return;
-							}
-
-							const rows = res.data.values;
-							if (rows.length) {
-								const BabyEmbed = new Discord.MessageEmbed().setTitle(
-									'Baby Food'
-								);
-
-								for (
-									let i = rows.length - 1;
-									i > rows.length - 6 && i > -1;
-									i--
-								) {
-									BabyEmbed.addField(
-										`${rows[i][0]} at ${rows[i][1]}`,
-										rows[i][2]
-									);
-								}
-
-								message.channel.send(BabyEmbed);
-							}
-						}
-					);
-				});
-				break;
-		}
-	}
 });
 
 bot.on('messageReactionAdd', async (reaction, user) => {

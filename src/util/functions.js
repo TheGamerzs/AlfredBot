@@ -1,5 +1,4 @@
 const botconfig = require('../botconfig.json');
-const { google } = require('googleapis'); //allows you to use googles api
 const Discord = require('discord.js');
 
 module.exports = {
@@ -105,50 +104,6 @@ module.exports = {
 
 		return PlayersEmbed;
 	},
-	/**
-	 * @callback RowCallback
-	 * @param {Array<String>} row The row
-	 */
-
-	/**
-	 * @summary Loop through all rows in range and run a function
-	 * @param {OAuth2Client} auth Google auth
-	 * @param {String} SpreadsheetID The spreadsheet
-	 * @param {String} Range Range
-	 * @param {Discord.GuildChannel} channel The channel
-	 * @param {RowCallback} callback What to do for each row
-	 */
-	ProcessAllInRange: function (auth, SpreadsheetID, Range, channel, callback) {
-		return new Promise(resolve => {
-			const sheets = google.sheets({
-				version: 'v4',
-				auth,
-			});
-
-			sheets.spreadsheets.values.get(
-				{
-					//get spreadsheet range
-					spreadsheetId: SpreadsheetID,
-					range: Range,
-				},
-				async (err, res) => {
-					if (err) {
-						channel.send(`The API returned an ${err}`);
-						return;
-					}
-
-					const rows = res.data.values;
-					if (rows.length) {
-						rows.map(async row => {
-							//for each row in rows run the callback function with the row
-							await callback(row);
-						});
-						resolve();
-					}
-				}
-			);
-		});
-	},
 
 	/**
 	 * @summary Gets the details for the member with the ID in the search column
@@ -165,79 +120,6 @@ module.exports = {
 					//get all their info into one array
 					if (err) return console.log(err);
 					resolve(result[0]); //return first found member
-				}
-			);
-		});
-	},
-
-	/**
-	 * @callback ApplicantCallback
-	 * @param {Array<String>} row Row with all applicant data
-	 * @param {Number} rowIndex Row number in the appsheet
-	 */
-	/**
-	 * @summary Finds all the info about an applicant
-	 * @param {OAuth2Client} auth Sheets
-	 * @param {Discord.GuildChannel} channel Discord channel
-	 * @param {String} ID Member ID
-	 * @param {Number} SearchColumn Column with the ID
-	 * @param {Number} CompanyIndex Index of the sign me up column
-	 * @param {ApplicantCallback} callback What to run when finding member
-	 */
-	FindApplicant: function (
-		auth,
-		channel,
-		ID,
-		SearchColumn,
-		CompanyIndex,
-		callback
-	) {
-		return new Promise(resolve => {
-			const sheets = google.sheets({
-				version: 'v4',
-				auth,
-			});
-
-			sheets.spreadsheets.values.get(
-				{
-					//get range
-					spreadsheetId: process.env.APPLICATIONS_SHEET,
-					range: botconfig.ApplicationRange,
-				},
-				(err, res) => {
-					if (err) return channel.send(`The API returned an ${err}`);
-
-					const rows = res.data.values;
-					if (rows.length) {
-						rows.map(async row => {
-							if (ID == '') {
-								//If they don't specify an ID
-								if (
-									(row[SearchColumn] == 'Under review' ||
-										row[SearchColumn] == '') &&
-									row[CompanyIndex] == 'Sign me up!'
-								) {
-									//If their status is Under review or no status and the applicant applied for the company
-									await callback(
-										row,
-										rows.indexOf(row) + botconfig.ApplicationStartingRow
-									);
-								}
-							} else {
-								if (
-									row[SearchColumn].startsWith(ID) &&
-									row[CompanyIndex] == 'Sign me up!'
-								) {
-									//If its the right applicant for the right company
-									await callback(
-										row,
-										rows.indexOf(row) + botconfig.ApplicationStartingRow
-									);
-								}
-							}
-						});
-						resolve();
-					}
 				}
 			);
 		});
@@ -262,51 +144,6 @@ module.exports = {
 					}
 				}
 			);
-		});
-	},
-
-	/**
-	 * @summary Gets the discord of an applicant
-	 * @param {OAuth2Client} auth Sheets Auth
-	 * @param {Discord.GuildChannel} channel Discord channel
-	 * @param {String} ID Member ID
-	 * @param {Number} SignMeUpIndex Index of Sign Me Up! in application sheet
-	 * @returns {String} Either discord ID or the string they typed in application if not found
-	 */
-	GetDiscordFromID: async function (auth, channel, ID, SignMeUpIndex) {
-		return new Promise(async resolve => {
-			let Discord;
-			await this.FindApplicant(
-				auth,
-				channel,
-				ID,
-				botconfig.ApplicationInGameIDIndex,
-				SignMeUpIndex,
-				async function (row) {
-					//Find applicant
-					return new Promise(res => {
-						let Discriminator =
-							row[botconfig.ApplicationDiscordIndex].split('#')[1]; //Gets the discrim number
-						let Username = row[botconfig.ApplicationDiscordIndex]
-							.split('#')[0]
-							.replace(/\s/g, ''); //Gets the username without any spaces
-						Discord = row[botconfig.ApplicationDiscordIndex]; //sets discord variable
-						channel.guild.members.cache.forEach(element => {
-							//search in server members
-							if (
-								element.user.discriminator == Discriminator &&
-								element.user.username.replace(/\s/g, '').toLowerCase() ==
-									Username.toLowerCase()
-							) {
-								//if the member discrim = app discrim and the username without spaces and lowercase = username lowercase
-								resolve(element.id); //resolves with ID
-							}
-						});
-						res();
-					});
-				}
-			);
-			resolve(Discord);
 		});
 	},
 

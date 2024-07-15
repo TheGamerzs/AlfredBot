@@ -1,8 +1,5 @@
 const Discord = require('discord.js'); //discord
 const botconfig = require('../botconfig.json'); //handy info
-const { google } = require('googleapis'); //allows you to use googles api
-const authentication = require('../util/authentication'); //Imports functions from authentication file
-const functions = require('../util/functions.js'); //Handy functions
 
 const Hellos = [
 	'hallo',
