@@ -1,6 +1,7 @@
 const Discord = require('discord.js');
 const fs = require('fs');
 const botconfig = require('../botconfig.json');
+const { create } = require('domain');
 
 function canUseCommand(member, commandPermissions) {
 	if (typeof commandPermissions == 'string') {
@@ -13,8 +14,45 @@ function canUseCommand(member, commandPermissions) {
 	});
 	return canUse;
 }
+
+let helpEmbed1;
+let helpEmbed2;
+let embedFieldCount = 0;
+
+function createHelpEmbed(bot) {
+	helpEmbed1 = new Discord.MessageEmbed() //2 different embeds cause lots of commands
+		.setTitle(`Alfreds Commands that YOU can use`, bot.user.displayAvatarURL())
+		.setDescription('Things in [] are optional. Things in <> are required')
+		.setThumbnail(bot.user.displayAvatarURL())
+		.setColor('RANDOM'); //random color
+	helpEmbed2 = new Discord.MessageEmbed();
+
+	embedFieldCount = 0;
+}
+
+function addCommandsToEmbed(commands, MemberRoles, folder) {
+	commands.forEach(f => {
+		const command = require(`${folder}${f}`);
+		if (command.help.disabled) return;
+		if (!canUseCommand(MemberRoles, command.help.permission)) return;
+		if (embedFieldCount < 25) {
+			helpEmbed1.addField(
+				`.${command.help.name} ${command.help.usage}`,
+				`${command.help.description}.`
+			);
+			embedFieldCount++;
+		} else if (embedFieldCount < 50) {
+			helpEmbed2.addField(
+				`.${command.help.name} ${command.help.usage}`,
+				`${command.help.description}.`
+			);
+			embedFieldCount++;
+		}
+	});
+}
+
 module.exports.run = async (bot, args) => {
-	return new Promise((resolve, reject) => {
+	return new Promise(async (resolve, reject) => {
 		let CommandFolder;
 		let MemberRoles;
 		if (args.guild_id == botconfig.PIGSServer) {
@@ -29,95 +67,38 @@ module.exports.run = async (bot, args) => {
 				.members.cache.get(args.author_id);
 		}
 
-		fs.readdir(`./src/${CommandFolder}`, (err, files) => {
-			//reads all files in the commands folder
-			if (err) {
-				console.log(err);
-				return reject('There was an error reading server commands.');
-			}
+		createHelpEmbed(bot);
 
-			const jsfile = files.filter(f => f.split('.').pop() == 'js'); //Removes non js files from the array
-			let help1 = new Discord.MessageEmbed() //2 different embeds cause lots of commands
-				.setTitle(
-					`Alfreds Commands that YOU can use`,
-					bot.user.displayAvatarURL()
-				)
-				.setDescription('Things in [] are optional. Things in <> are required')
-				.setThumbnail(bot.user.displayAvatarURL())
-				.setColor('RANDOM'); //random color
-			let help2 = new Discord.MessageEmbed();
-
-			let i = 0; //track how many times i've added to an embed
-
-			jsfile.forEach(f => {
-				//for each file in commands
-				const command = require(`../${CommandFolder}${f}`);
-				if (command.help.disabled) return;
-
-				if (i < 25 && canUseCommand(MemberRoles, command.help.permission)) {
-					//If i haven't added 25 fields
-					help1.addField(
-						`.${command.help.name} ${command.help.usage}`,
-						`${command.help.description}.`
-					); //adds the command info to the embed
-					i++; //adds 1 to I
-				} else if (
-					i < 50 &&
-					canUseCommand(MemberRoles, command.help.permission)
-				) {
-					//need 2 because you can't have more than 25 fields in an embed or else it fails
-					help2.addField(
-						`.${command.help.name} ${command.help.usage}`,
-						`${command.help.description}.`
-					);
-					i++;
-				}
-			});
-
-			fs.readdir('./src/Bothcommands', (err, files) => {
-				//reads all files in the commands folder
-				if (err) {
-					console.log(err);
-					return reject('Unable to get global commands.');
-				}
-
-				const jsfile = files.filter(f => f.split('.').pop() == 'js'); //removes non js files from array
-
-				jsfile.forEach(f => {
-					//for each file in commands
-					const command = require(`../Bothcommands/${f}`);
-					if (command.help.disabled) return;
-					if (i < 25 && canUseCommand(MemberRoles, command.help.permission)) {
-						//Doesn't go over 25
-						help1.addField(
-							`.${command.help.name} ${command.help.usage}`,
-							`${command.help.description}.`
-						); //adds the command info to the embed
-						i++; //adds 1 to I
-					} else if (
-						i < 50 &&
-						canUseCommand(MemberRoles, command.help.permission)
-					) {
-						//need 2 because you can't have more than 25 fields in an embed or else it fails
-						help2.addField(
-							`.${command.help.name} ${command.help.usage}`,
-							`${command.help.description}.`
-						);
-						i++;
-					}
-				});
-
-				if (!help2.fields[0]) {
-					//if there aren't any fields in the help2 embed
-					return resolve(help1);
-				} else {
-					//are fields in help2
-					return resolve([help1, help2]);
-				}
-			});
+		const [companyCommands, BothCommands] = await Promise.all([
+			getCommands(`./src/${CommandFolder}`),
+			getCommands('./src/Bothcommands/'),
+		]).catch(err => {
+			console.log(err);
+			return reject('There was an error getting commands.');
 		});
+
+		addCommandsToEmbed(companyCommands, MemberRoles, `../${CommandFolder}`);
+
+		addCommandsToEmbed(BothCommands, MemberRoles, '../Bothcommands/');
+
+		return resolve([helpEmbed1, helpEmbed2]);
 	});
 };
+
+async function getCommands(folder) {
+	return new Promise((resolve, reject) => {
+		fs.readdir(folder, (err, files) => {
+			if (err) {
+				console.log(err);
+				return reject(`There was an error reading ${folder} commands.`);
+			}
+
+			const jsfile = files.filter(f => f.split('.').pop() == 'js');
+
+			return resolve(jsfile);
+		});
+	});
+}
 
 module.exports.help = {
 	name: 'help',
