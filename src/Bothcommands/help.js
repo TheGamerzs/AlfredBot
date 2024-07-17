@@ -18,18 +18,18 @@ module.exports.run = async (bot, args) => {
 		let CommandFolder;
 		let MemberRoles;
 		if (args.guild_id == botconfig.PIGSServer) {
-			CommandFolder = './PIGScommands/'; //folder with pigs commands
+			CommandFolder = 'PIGScommands/'; //folder with pigs commands
 			MemberRoles = bot.guilds.cache
 				.get(botconfig.PIGSServer)
 				.members.cache.get(args.author_id);
 		} else if (args.guild_id == botconfig.RTSServer) {
-			CommandFolder = './RTScommands/'; //folder with rts commands
+			CommandFolder = 'RTScommands/'; //folder with rts commands
 			MemberRoles = bot.guilds.cache
 				.get(botconfig.RTSServer)
 				.members.cache.get(args.author_id);
 		}
 
-		fs.readdir(CommandFolder, (err, files) => {
+		fs.readdir(`./src/${CommandFolder}`, (err, files) => {
 			//reads all files in the commands folder
 			if (err) {
 				console.log(err);
@@ -51,7 +51,7 @@ module.exports.run = async (bot, args) => {
 
 			jsfile.forEach(f => {
 				//for each file in commands
-				const command = require(`.${CommandFolder}${f}`);
+				const command = require(`../${CommandFolder}${f}`);
 				if (command.help.disabled) return;
 
 				if (i < 25 && canUseCommand(MemberRoles, command.help.permission)) {
@@ -74,7 +74,7 @@ module.exports.run = async (bot, args) => {
 				}
 			});
 
-			fs.readdir('./Bothcommands', (err, files) => {
+			fs.readdir('./src/Bothcommands', (err, files) => {
 				//reads all files in the commands folder
 				if (err) {
 					console.log(err);
