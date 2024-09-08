@@ -528,7 +528,7 @@ slash.addCommands = async slashCommands => {
 						const rtscmdPermissions = [
 							{
 								type: 2,
-								id: botconfig.GaboID,
+								id: botconfig.CTOID,
 								permission: true,
 							},
 							{
@@ -540,7 +540,7 @@ slash.addCommands = async slashCommands => {
 						const pigscmdPermissions = [
 							{
 								type: 2,
-								id: botconfig.GaboID,
+								id: botconfig.CTOID,
 								permission: true,
 							},
 							{
@@ -688,7 +688,7 @@ slash.addCommands = async slashCommands => {
 						const cmdPermissions = [
 							{
 								type: 2,
-								id: botconfig.GaboID,
+								id: botconfig.CTOID,
 								permission: true,
 							},
 							{
@@ -767,7 +767,7 @@ slash.addCommands = async slashCommands => {
 				const rtscmdPermissions = [
 					{
 						type: 2,
-						id: botconfig.GaboID,
+						id: botconfig.CTOID,
 						permission: true,
 					},
 					{
@@ -779,7 +779,7 @@ slash.addCommands = async slashCommands => {
 				const pigscmdPermissions = [
 					{
 						type: 2,
-						id: botconfig.GaboID,
+						id: botconfig.CTOID,
 						permission: true,
 					},
 					{
